@@ -1,13 +1,17 @@
 import streamlit as st
+from streamlit.runtime.uploaded_file_manager import UploadedFile
 from docx import Document
 from docx.document import Document as DocumentObject
 from docx.shared import Inches
 from io import BytesIO
 from PIL import Image
 import re
+from logging import getLogger
 
-# Max image size (10 MB)
-MAX_IMAGE_SIZE = 10 * 1024 * 1024
+logging = getLogger(__name__)
+
+# Max image size (200 MB)
+MAX_IMAGE_SIZE = 200 * 1024 * 1024
 
 def count_existing_images(doc: DocumentObject, prefix: str) -> int:
     """
@@ -26,6 +30,29 @@ def count_existing_images(doc: DocumentObject, prefix: str) -> int:
             except ValueError:
                 continue
     return max_index
+
+def process_doc_upload() -> str:
+    """
+    Process a file and return its name.
+    """
+    uploaded_doc: UploadedFile = st.session_state['uploaded_doc']
+    if uploaded_doc is not None:
+        try:
+            doc = Document(uploaded_doc)
+            st.session_state['doc'] = doc
+            st.session_state['doc_name'] = uploaded_doc.name
+            st.session_state.pop('doc_io', None)  # Clear any previous download
+            st.success(f"Loaded document: {uploaded_doc.name}")
+            return uploaded_doc.name
+        except Exception as e:
+            st.error(f"Error loading document: {e}")
+            return None
+    else:
+        st.session_state.pop('doc', None)
+        st.session_state.pop('doc_name', None)
+        st.session_state.pop('doc_io', None)
+        return None
+    
 
 def main():
     # Configure the page to use a wide layout so the sidebar does not overlap the main content
@@ -47,26 +74,9 @@ def main():
             st.success("New document created!")
 
         # 2. Upload Existing Document
-        uploaded_doc = st.file_uploader("Upload Existing Document", type=["docx"])
-        if uploaded_doc is not None:
-            try:
-                doc = Document(uploaded_doc)
-                st.session_state['doc'] = doc
-                st.session_state['doc_name'] = uploaded_doc.name
-                st.session_state.pop('doc_io', None)  # Clear any previous download
-                st.success(f"Loaded document: {uploaded_doc.name}")
-            except Exception as e:
-                st.error(f"Error loading document: {e}")
+        uploaded_doc = st.file_uploader("Upload Existing Document", type=["docx"], key='uploaded_doc', on_change=process_doc_upload)
 
-        # 3. Remove Document
-        if 'doc_name' in st.session_state:
-            if st.button("Remove Document"):
-                st.session_state.pop('doc', None)
-                st.session_state.pop('doc_name', None)
-                st.session_state.pop('doc_io', None)
-                st.rerun()
-
-        # 4. Append Images Button (shown only if we have images & a loaded doc)
+        # 3. Append Images Button (shown only if we have images & a loaded doc)
         if 'doc' in st.session_state and 'uploaded_images' in st.session_state:
             if st.session_state['uploaded_images']:
                 if st.button("Append Images"):
@@ -88,7 +98,7 @@ def main():
                             image_file.seek(0)
                             # Add spacing before the image
                             doc.add_paragraph("")
-                            doc.add_picture(image_file)
+                            doc.add_picture(image_file, width=Inches(7))
 
                             # Determine label
                             if naming_mode == "Auto-numbering":
@@ -115,7 +125,7 @@ def main():
                     except Exception as e:
                         st.error(f"Error saving document: {e}")
 
-        # 5. Download Updated Document
+        # 4. Download Updated Document
         if 'doc_io' in st.session_state:
             st.download_button(
                 label="Download Updated Document",
