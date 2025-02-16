@@ -1,7 +1,10 @@
 [project]
 name = "streamlit-doc-enhancer"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Streamlit application to help users easily append images to Word documents."
+authors = [
+    {name = "Sérgio Silva", email = "sergio.pds@outlook.pt"},  
+]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
