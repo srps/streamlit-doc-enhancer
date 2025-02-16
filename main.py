@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 from docx import Document
 from docx.document import Document as DocumentObject
-from docx.shared import Inches
+from docx.shared import Mm
 from io import BytesIO
 from PIL import Image
 import re
@@ -42,7 +42,7 @@ def process_doc_upload() -> str:
             st.session_state['doc'] = doc
             st.session_state['doc_name'] = uploaded_doc.name
             st.session_state.pop('doc_io', None)  # Clear any previous download
-            st.success(f"Loaded document: {uploaded_doc.name}")
+            st.toast(f"Loaded document: {uploaded_doc.name}")
             return uploaded_doc.name
         except Exception as e:
             st.error(f"Error loading document: {e}")
@@ -61,82 +61,20 @@ def main():
     st.title("Word Document Image Appender")
 
     # ---------------------------------
-    # SIDEBAR: Document Actions & Buttons
-    # ---------------------------------
-    with st.sidebar:
-        st.header("Document Actions")
-
-        # 1. Create New Document
-        if st.button("Create New Document"):
-            st.session_state['doc'] = Document()
-            st.session_state['doc_name'] = "New_Document.docx"
-            st.session_state.pop('doc_io', None)  # Clear any previous download
-            st.success("New document created!")
-
-        # 2. Upload Existing Document
-        uploaded_doc = st.file_uploader("Upload Existing Document", type=["docx"], key='uploaded_doc', on_change=process_doc_upload)
-
-        # 3. Append Images Button (shown only if we have images & a loaded doc)
-        if 'doc' in st.session_state and 'uploaded_images' in st.session_state:
-            if st.session_state['uploaded_images']:
-                if st.button("Append Images"):
-                    doc: DocumentObject = st.session_state['doc']
-                    naming_mode = st.session_state.get('naming_mode', 'Auto-numbering')
-                    image_prefix = st.session_state.get('image_prefix', 'Image')
-                    custom_names = st.session_state.get('custom_names', [])
-
-                    # For auto-numbering, count existing images for next index
-                    if naming_mode == "Auto-numbering":
-                        current_index = count_existing_images(doc, image_prefix)
-
-                    # Append each image
-                    for idx, image_file in enumerate(st.session_state['uploaded_images']):
-                        if image_file.size > MAX_IMAGE_SIZE:
-                            st.error(f"**{image_file.name}** exceeds the maximum file size limit. Skipping.")
-                            continue
-                        try:
-                            image_file.seek(0)
-                            # Add spacing before the image
-                            doc.add_paragraph("")
-                            doc.add_picture(image_file, width=Inches(7))
-
-                            # Determine label
-                            if naming_mode == "Auto-numbering":
-                                current_index += 1
-                                label = f"{image_prefix}{current_index}"
-                            else:
-                                # Custom name (fallback to base filename if blank)
-                                label = custom_names[idx] or image_file.name.rsplit(".", 1)[0]
-
-                            # Add label below image
-                            doc.add_paragraph(label)
-                            # Extra spacing
-                            doc.add_paragraph("")
-                        except Exception as e:
-                            st.error(f"Error appending {image_file.name}: {e}")
-
-                    # Save to BytesIO
-                    doc_io = BytesIO()
-                    try:
-                        doc.save(doc_io)
-                        doc_io.seek(0)
-                        st.session_state['doc_io'] = doc_io
-                        st.success("Images appended successfully!")
-                    except Exception as e:
-                        st.error(f"Error saving document: {e}")
-
-        # 4. Download Updated Document
-        if 'doc_io' in st.session_state:
-            st.download_button(
-                label="Download Updated Document",
-                data=st.session_state['doc_io'],
-                file_name=st.session_state.get('doc_name', 'document.docx'),
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
-
-    # ---------------------------------
     # MAIN AREA: Document & Image Management
     # ---------------------------------
+    st.subheader("Step 1: Create or Upload Document")
+
+    doc_name = st.text_input("Document Name", value="New_Document")
+
+    if st.button("Create New Document"):
+        st.session_state['doc'] = Document()
+        st.session_state['doc_name'] = doc_name + ".docx"
+        st.session_state.pop('doc_io', None)  # Clear any previous download
+        st.toast("New document created!")
+
+    uploaded_doc = st.file_uploader("Upload Existing Document", type=["docx"], key='uploaded_doc', on_change=process_doc_upload)
+
     if 'doc_name' in st.session_state:
         st.info(f"**Current Document:** {st.session_state['doc_name']}")
 
@@ -201,6 +139,76 @@ def main():
 
     # Keep custom names in session state
     st.session_state['custom_names'] = custom_names
+
+    # ---------------------------------
+    # SIDEBAR: Document Actions & Buttons
+    # ---------------------------------
+    with st.sidebar:
+        st.header("Document Actions")
+
+        # 3. Append Images Button (shown only if we have images & a loaded doc)
+        if 'doc' in st.session_state and 'uploaded_images' in st.session_state:
+            if st.session_state['uploaded_images']:
+                if st.button("Append Images"):
+                    doc: DocumentObject = st.session_state['doc']
+                    naming_mode = st.session_state.get('naming_mode', 'Auto-numbering')
+                    image_prefix = st.session_state.get('image_prefix', 'Image')
+                    custom_names = st.session_state.get('custom_names', [])
+
+                    # For auto-numbering, count existing images for next index
+                    if naming_mode == "Auto-numbering":
+                        current_index = count_existing_images(doc, image_prefix)
+
+                    # Append each image
+                    for idx, image_file in enumerate(st.session_state['uploaded_images']):
+                        if image_file.size > MAX_IMAGE_SIZE:
+                            st.error(f"**{image_file.name}** exceeds the maximum file size limit. Skipping.")
+                            continue
+                        try:
+                            image_file.seek(0)
+                            # Add spacing before the image
+                            doc.add_paragraph("")
+                            doc.add_picture(image_file, width=Mm(150))
+
+                            # Determine label
+                            if naming_mode == "Auto-numbering":
+                                current_index += 1
+                                label = f"{image_prefix}{current_index}"
+                            else:
+                                # Custom name (fallback to base filename if blank)
+                                label = custom_names[idx] or image_file.name.rsplit(".", 1)[0]
+
+                            # Add label below image
+                            doc.add_paragraph(label)
+                            # Extra spacing
+                            doc.add_paragraph("")
+                        except Exception as e:
+                            st.error(f"Error appending {image_file.name}: {e}")
+
+                    # Save to BytesIO
+                    doc_io = BytesIO()
+                    try:
+                        doc.save(doc_io)
+                        doc_io.seek(0)
+                        st.session_state['doc_io'] = doc_io
+                        st.success("Images appended successfully!")
+                    except Exception as e:
+                        st.error(f"Error saving document: {e}")
+            else:
+                st.button("Append Images (Upload Images First)", disabled=True)
+        else:
+            st.button("Append Images (Create or Upload Existing Document First)", disabled=True)
+
+        # 4. Download Updated Document
+        if 'doc_io' in st.session_state:
+            st.download_button(
+                label="Download Updated Document",
+                data=st.session_state['doc_io'],
+                file_name=st.session_state.get('doc_name', 'document.docx'),
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+        else:
+            st.button("Download Updated Document (Append Images First)", disabled=True)
 
 if __name__ == "__main__":
     main()
