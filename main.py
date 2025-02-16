@@ -79,7 +79,7 @@ def main():
         st.info(f"**Current Document:** {st.session_state['doc_name']}")
 
     # Image Naming Mode
-    st.subheader("Image Naming Mode")
+    st.subheader("Image Settings")
     naming_mode = st.radio(
         "Choose how you want to name images:",
         options=["Auto-numbering", "Custom naming"],
@@ -90,8 +90,19 @@ def main():
     # If auto-numbering, allow user to set a prefix
     if naming_mode == "Auto-numbering":
         image_prefix = st.text_input("Image Prefix", value="Image", key="image_prefix")
+        image_index = st.text_input("Image Index Start", value="1", key="image_index")
     else:
         st.info("You will be able to set a custom name for each image below.")
+    
+    image_width_mm = st.slider(
+        "Image Width (millimeters)",
+        min_value=50,
+        max_value=300,
+        value=150,
+        step=10,
+        help="Select the width for inserted images in millimeters"
+    )
+
 
     # Image Uploader & Preview
     st.subheader("Select Images")
@@ -168,12 +179,12 @@ def main():
                             image_file.seek(0)
                             # Add spacing before the image
                             doc.add_paragraph("")
-                            doc.add_picture(image_file, width=Mm(150))
+                            doc.add_picture(image_file, width=Mm(image_width_mm))
 
                             # Determine label
                             if naming_mode == "Auto-numbering":
+                                label = f"{image_prefix}{current_index + int(image_index)}"
                                 current_index += 1
-                                label = f"{image_prefix}{current_index}"
                             else:
                                 # Custom name (fallback to base filename if blank)
                                 label = custom_names[idx] or image_file.name.rsplit(".", 1)[0]
